@@ -24,7 +24,6 @@ This lab demonstrates three SOC workflows:
 Agents enroll and communicate with the manager using standard Wazuh ports (e.g., 1514/1515). [web:63]
 
 ## 3) Evidence (screenshots)
-Replace the placeholder files in `evidence/` with your real screenshots (keep the same filenames):
 - `agents.png` — Agent inventory + status overview
 - `windows_overview.png` — Windows endpoint overview (vulns + CIS + MITRE)
 - `windows_details.png` — Windows endpoint details panel
