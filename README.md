@@ -4,7 +4,7 @@
 **Stack:** Wazuh (manager + dashboard), Windows endpoint, Ubuntu endpoint, Kali endpoint (WSL2), VMware Workstation networking  
 
 ## 1) Project summary
-I built a home Security Operations (SOC) lab using Wazuh, an open-source platform with SIEM and XDR capabilities, to ingest endpoint telemetry, perform threat detection and compliance checks, and automate containment actions. [web:156]
+I built a home Security Operations (SOC) lab using Wazuh to ingest endpoint telemetry, perform threat detection and compliance checks, and automate containment actions.  
 
 This lab demonstrates three SOC workflows:
 - **Visibility:** onboarding endpoints and verifying data flow end-to-end.
@@ -21,9 +21,11 @@ This lab demonstrates three SOC workflows:
 - Kali Linux endpoint (`KaliLinuxUser`) enrolled as an agent.
 - Ubuntu endpoint (`UbuntuUser`) enrolled as an agent.
 
-Agents enroll and communicate with the manager using standard Wazuh ports (e.g., 1514/1515). [web:63]
+Agent enrollment/communication requires reaching the manager on the standard ports (default 1514/1515).  
+Docs: https://documentation.wazuh.com/current/user-manual/agent/agent-enrollment/requirements.html
 
 ## 3) Evidence (screenshots)
+
 - `agents.png` — Agent inventory + status overview
 - `windows_overview.png` — Windows endpoint overview (vulns + CIS + MITRE)
 - `windows_details.png` — Windows endpoint details panel
@@ -46,13 +48,15 @@ Agents enroll and communicate with the manager using standard Wazuh ports (e.g.,
 ![FIM events](evidence/fim_events.png)
 
 ## 4) Key capabilities demonstrated
-- **Endpoint onboarding and connectivity validation** (Windows + Linux endpoints). [web:63]
-- **Threat hunting** through centralized event review and MITRE ATT&CK mapping. [web:156]
-- **Vulnerability detection + Security Configuration Assessment (CIS)** to surface hygiene and compliance gaps. [web:156]
-- **File Integrity Monitoring (FIM)** to detect file creation/deletion in realtime directories. [web:213]
+- **Endpoint onboarding and connectivity validation** (Windows + Linux endpoints).
+- **Threat hunting** through centralized event review and MITRE ATT&CK mapping.
+- **Vulnerability detection + Security Configuration Assessment (CIS)** to surface hygiene and compliance gaps.
+- **File Integrity Monitoring (FIM)** to detect file creation/deletion in realtime directories.
+
+FIM (syscheck) configuration reference: https://documentation.wazuh.com/current/user-manual/reference/ossec-conf/syscheck.html
 
 ## 5) Highlight: VirusTotal + Active Response quarantine (end-to-end)
-**FIM detects a file → VirusTotal enriches it → Active Response quarantines it automatically.** [web:185][web:188][web:181]
+**FIM detects a file → VirusTotal enriches it → Active Response quarantines it automatically.**
 
 ### 5.1 Configure FIM (Kali agent)
 ```bash
@@ -60,11 +64,10 @@ sudo mkdir -p /home/vukhanh732/watch /home/vukhanh732/quarantine
 sudo chown -R vukhanh732:vukhanh732 /home/vukhanh732/watch /home/vukhanh732/quarantine
 ```
 
-In `/var/ossec/etc/ossec.conf` on the Kali agent:
+In `/var/ossec/etc/ossec.conf` on the Kali agent, add to the existing `<syscheck>` block:
 ```xml
 <directories check_all="yes" realtime="yes">/home/vukhanh732/watch</directories>
 ```
-Syscheck is Wazuh’s file integrity monitoring config section, and realtime monitoring is supported. [web:213]
 
 Restart/validate:
 ```bash
@@ -82,7 +85,9 @@ In `/var/ossec/etc/ossec.conf` on the Wazuh server:
   <alert_format>json</alert_format>
 </integration>
 ```
-Wazuh documents VirusTotal integration and that it logs to `integrations.log`. [web:188][web:212]
+
+VirusTotal integration docs: https://documentation.wazuh.com/current/user-manual/capabilities/malware-detection/virus-total-integration.html  
+`integration` block reference: https://documentation.wazuh.com/current/user-manual/reference/ossec-conf/integration.html
 
 Restart manager:
 ```bash
@@ -95,13 +100,20 @@ printf 'X5O!P%%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*' 
 ```
 
 ### 5.4 Active Response quarantine
-Wazuh Active Response supports custom scripts to execute endpoint actions in response to alerts. [web:181][web:249]
+Wazuh Active Response supports custom scripts to execute endpoint actions in response to alerts.
 
 - Script path (Kali agent): `/var/ossec/active-response/bin/quarantine.sh`
-- Trigger: VirusTotal malicious alert rule id (example: `87105`) [web:185]
+- Trigger: VirusTotal malicious alert rule id (example: `87105`)
 - Result: file moved from `watch/` to `quarantine/` with a timestamped filename.
 
+Active Response docs:
+- How to configure: https://documentation.wazuh.com/current/user-manual/capabilities/active-response/how-to-configure.html
+- active-response reference: https://documentation.wazuh.com/current/user-manual/reference/ossec-conf/active-response.html
+- Custom scripts: https://documentation.wazuh.com/current/user-manual/capabilities/active-response/custom-active-response-scripts.html
+
+VirusTotal removal PoC (end-to-end workflow): https://documentation.wazuh.com/current/proof-of-concept-guide/detect-remove-malware-virustotal.html
+
 ## 6) Resume-ready bullets
-- Deployed Wazuh (open-source SIEM/XDR) in a VMware homelab, onboarded Windows and Linux endpoints, and validated end-to-end telemetry ingestion and MITRE ATT&CK visibility. [web:156]
-- Implemented realtime file integrity monitoring and VirusTotal enrichment, then automated containment using Wazuh Active Response quarantine on detection. [web:213][web:188][web:181]
+- Deployed Wazuh in a VMware homelab, onboarded Windows and Linux endpoints, and validated end-to-end telemetry ingestion and MITRE ATT&CK visibility.
+- Implemented realtime file integrity monitoring and VirusTotal enrichment, then automated containment using Wazuh Active Response quarantine on detection.
 - Authored a portfolio-quality incident workflow with screenshots, reproducible commands, and troubleshooting notes.
