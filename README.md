@@ -1,119 +1,61 @@
-# Wazuh Home SIEM/XDR Homelab (VMware) — Multi-Endpoint SOC Lab + Automated Quarantine
+# Wazuh SOC HomeLab
 
-**Owner:** Vu Khanh  
-**Stack:** Wazuh (manager + dashboard), Windows endpoint, Ubuntu endpoint, Kali endpoint (WSL2), VMware Workstation networking  
+A VMware lab for following endpoint events through detection and investigation. One Wazuh manager monitors Windows, Ubuntu and Kali endpoints, with evidence from agent inventory, MITRE ATT&CK views and file-integrity events.
 
-## 1) Project summary
-I built a home Security Operations (SOC) lab using Wazuh to ingest endpoint telemetry, perform threat detection and compliance checks, and automate containment actions.  
+[Case study](https://security-vu.netlify.app/wazuh.html) · [Lab setup notes](docs/lab-setup.md) · [Offline triage example](examples/triage.sample.md)
 
-This lab demonstrates three SOC workflows:
-- **Visibility:** onboarding endpoints and verifying data flow end-to-end.
-- **Detection & triage:** threat hunting, MITRE ATT&CK mapping, and reviewing file integrity + endpoint events.
-- **Response automation:** VirusTotal enrichment + Active Response quarantine to reduce dwell time.
+## Architecture
 
-## 2) Architecture (host vs agents)
-### Wazuh server (the “SIEM server”)
-- Ubuntu VM running the Wazuh manager + dashboard.
-- Manager IP: `192.168.64.129` (VMware NAT/VMnet8).
+```text
+Windows ─┐
+Ubuntu  ─┼─→ Wazuh manager / indexer / dashboard
+Kali    ─┘       → endpoint inventory, FIM, MITRE views
+                  → VirusTotal enrichment / lab response configuration
 
-### Agents (endpoints)
-- Windows endpoint (`WindowUser`) enrolled as an agent.
-- Kali Linux endpoint (`KaliLinuxUser`) enrolled as an agent.
-- Ubuntu endpoint (`UbuntuUser`) enrolled as an agent.
+Exported JSONL alerts → Python triage tool → Markdown investigation summary
+```
 
-Agent enrollment/communication requires reaching the manager on the standard ports (default 1514/1515).  
-Docs: https://documentation.wazuh.com/current/user-manual/agent/agent-enrollment/requirements.html
+The lab setup notes describe the VirusTotal and Active Response quarantine configuration. The custom quarantine script is not checked in, so automated containment is not a turnkey feature of this repository. The new triage utility runs separately on exported alerts and does not connect to the manager or change files on endpoints.
 
-## 3) Evidence (screenshots)
+## Evidence from the lab
 
-- `agents.png` — Agent inventory + status overview
-- `windows_overview.png` — Windows endpoint overview (vulns + CIS + MITRE)
-- `windows_details.png` — Windows endpoint details panel
-- `kali_overview.png` — Kali endpoint overview
-- `mitre_events.png` — MITRE ATT&CK dashboard for Kali events
-- `fim_events.png` — FIM recent events showing EICAR added/deleted
+![Three monitored endpoints in the Wazuh agent inventory](evidence/agents.png)
 
-### 3.1 Agent inventory
-![Agents list](evidence/agents.png)
+| Evidence | What it shows |
+| --- | --- |
+| [Windows overview](evidence/windows_overview.png) / [details](evidence/windows_details.png) | Endpoint inventory, vulnerability and configuration views |
+| [Kali overview](evidence/kali_overview.png) / [MITRE events](evidence/mitre_events.png) | Linux telemetry and rule-to-technique mapping |
+| [File integrity events](evidence/fim_events.png) | EICAR test-file creation/deletion events |
 
-### 3.2 Windows endpoint (vuln + CIS + activity)
-![Windows endpoint overview](evidence/windows_overview.png)
-![Windows endpoint details](evidence/windows_details.png)
+These are existing lab captures. They do not measure production coverage, response speed or confirmed malicious incidents.
 
-### 3.3 Kali endpoint + MITRE ATT&CK
-![Kali endpoint overview](evidence/kali_overview.png)
-![MITRE ATT&CK view](evidence/mitre_events.png)
+## Summarize an alert export
 
-### 3.4 File integrity monitoring (EICAR)
-![FIM events](evidence/fim_events.png)
+Python 3.10+, standard library only. Input is one Wazuh alert JSON object per line, such as an exported `alerts.json` file.
 
-## 4) Key capabilities demonstrated
-- **Endpoint onboarding and connectivity validation** (Windows + Linux endpoints).
-- **Threat hunting** through centralized event review and MITRE ATT&CK mapping.
-- **Vulnerability detection + Security Configuration Assessment (CIS)** to surface hygiene and compliance gaps.
-- **File Integrity Monitoring (FIM)** to detect file creation/deletion in realtime directories.
-
-FIM (syscheck) configuration reference: https://documentation.wazuh.com/current/user-manual/reference/ossec-conf/syscheck.html
-
-## 5) Highlight: VirusTotal + Active Response quarantine (end-to-end)
-**FIM detects a file → VirusTotal enriches it → Active Response quarantines it automatically.**
-
-### 5.1 Configure FIM (Kali agent)
 ```bash
-sudo mkdir -p /home/vukhanh732/watch /home/vukhanh732/quarantine
-sudo chown -R vukhanh732:vukhanh732 /home/vukhanh732/watch /home/vukhanh732/quarantine
+git clone https://github.com/vukhanh732/Wazuh-SOC-HomeLab.git
+cd Wazuh-SOC-HomeLab
+python3 tools/triage.py examples/alerts.sample.jsonl --min-level 7
+python3 tools/triage.py /path/to/alerts.json --min-level 10 --agent 003 --output triage.md
 ```
 
-In `/var/ossec/etc/ossec.conf` on the Kali agent, add to the existing `<syscheck>` block:
-```xml
-<directories check_all="yes" realtime="yes">/home/vukhanh732/watch</directories>
-```
+The report groups matching alerts by rule level, endpoint, MITRE technique ID and detection rule. `--agent` accepts an exact agent name or ID. Counts describe **alerts**, not distinct incidents or confirmed attacks. Endpoints with the same display name are grouped together; technique IDs are counted once per alert.
 
-Restart/validate:
+The bundled JSONL and [generated report](examples/triage.sample.md) are **synthetic demonstration fixtures**, separate from the real lab screenshots. No credentials or live manager access are needed to try them.
+
+Malformed JSON, invalid levels and unsupported field shapes stop processing with exit code `2` and a line number. Output is written only after parsing succeeds. Untrusted fields are escaped for Markdown/HTML rendering.
+
+## Verify
+
 ```bash
-sudo /var/ossec/bin/wazuh-agentd -t
-sudo systemctl restart wazuh-agent
+python3 -m unittest discover -s tests -v
 ```
 
-### 5.2 Enable VirusTotal integration (Wazuh server)
-In `/var/ossec/etc/ossec.conf` on the Wazuh server:
-```xml
-<integration>
-  <name>virustotal</name>
-  <api_key>YOUR_VIRUSTOTAL_API_KEY</api_key>
-  <group>syscheck</group>
-  <alert_format>json</alert_format>
-</integration>
-```
+Regression tests cover filtering/counting, technique deduplication, malformed alerts and untrusted report text.
 
-VirusTotal integration docs: https://documentation.wazuh.com/current/user-manual/capabilities/malware-detection/virus-total-integration.html  
-`integration` block reference: https://documentation.wazuh.com/current/user-manual/reference/ossec-conf/integration.html
+## Reproduce the lab
 
-Restart manager:
-```bash
-sudo systemctl restart wazuh-manager
-```
+See [lab setup notes](docs/lab-setup.md) for FIM and VirusTotal configuration and the EICAR test workflow. Addresses and paths are examples from a private VMware NAT network. Bring your own Wazuh installation and VirusTotal API key. Follow the linked official Wazuh documentation for the installed version.
 
-### 5.3 Safe test trigger (EICAR)
-```bash
-printf 'X5O!P%%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*' > /home/vukhanh732/watch/eicar.com
-```
-
-### 5.4 Active Response quarantine
-Wazuh Active Response supports custom scripts to execute endpoint actions in response to alerts.
-
-- Script path (Kali agent): `/var/ossec/active-response/bin/quarantine.sh`
-- Trigger: VirusTotal malicious alert rule id (example: `87105`)
-- Result: file moved from `watch/` to `quarantine/` with a timestamped filename.
-
-Active Response docs:
-- How to configure: https://documentation.wazuh.com/current/user-manual/capabilities/active-response/how-to-configure.html
-- active-response reference: https://documentation.wazuh.com/current/user-manual/reference/ossec-conf/active-response.html
-- Custom scripts: https://documentation.wazuh.com/current/user-manual/capabilities/active-response/custom-active-response-scripts.html
-
-VirusTotal removal PoC (end-to-end workflow): https://documentation.wazuh.com/current/proof-of-concept-guide/detect-remove-malware-virustotal.html
-
-## 6) Resume-ready bullets
-- Deployed Wazuh in a VMware homelab, onboarded Windows and Linux endpoints, and validated end-to-end telemetry ingestion and MITRE ATT&CK visibility.
-- Implemented realtime file integrity monitoring and VirusTotal enrichment, then automated containment using Wazuh Active Response quarantine on detection.
-- Authored a portfolio-quality incident workflow with screenshots, reproducible commands, and troubleshooting notes.
+Next work: include a reviewed response implementation, test failed response actions, and add noisier investigation scenarios. The offline triage tool is tested locally; it has not been deployed as a live SOC integration.

@@ -1,0 +1,2 @@
+{"agent":{"id":"001","name":"sample-windows"},"rule":{"id":"550","level":7,"description":"File integrity changed","mitre":{"id":["T1565.001"]}}}
+{"agent":{"id":"002","name":"sample-linux"},"rule":{"id":"87105","level":12,"description":"Sample positive VirusTotal enrichment"}}
