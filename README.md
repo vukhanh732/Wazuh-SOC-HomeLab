@@ -15,7 +15,7 @@ Kali    ─┘       → endpoint inventory, FIM, MITRE views
 Exported JSONL alerts → Python triage tool → Markdown investigation summary
 ```
 
-The repository includes a constrained Linux Active Response quarantine handler. It accepts only a stateless `add` message for rule `87105` with `data.virustotal.source.file` directly inside a configured watch directory. It defaults to dry-run; the supplied wrapper enables moving files into a separate quarantine directory. Review the [installation and test notes](docs/lab-setup.md) before enabling it. The handler has local filesystem tests, but has not been validated against a live Wazuh manager or agent.
+The repo also includes an offline triage tool and a Linux quarantine handler. The handler defaults to a dry run and only accepts the expected VirusTotal alert and watched file path. See the [local demo and install notes](docs/lab-setup.md). It has filesystem tests, but no live Wazuh integration test.
 
 ## Evidence from the lab
 
@@ -31,20 +31,19 @@ These are existing lab captures. They do not measure production coverage, respon
 
 ## Summarize an alert export
 
-Python 3.10+, standard library only. Input is one Wazuh alert JSON object per line, such as an exported `alerts.json` file.
+Python 3.10+, standard library only. The bundled export is synthetic:
 
 ```bash
 git clone https://github.com/vukhanh732/Wazuh-SOC-HomeLab.git
 cd Wazuh-SOC-HomeLab
 python3 tools/triage.py examples/alerts.sample.jsonl --min-level 7
-python3 tools/triage.py /path/to/alerts.json --min-level 10 --agent 003 --output triage.md
 ```
 
-The report groups matching alerts by rule level, endpoint, MITRE technique ID and detection rule. `--agent` accepts an exact agent name or ID. Counts describe **alerts**, not distinct incidents or confirmed attacks. Endpoints with the same display name are grouped together; technique IDs are counted once per alert.
+The [sample report](examples/triage.sample.md) groups alerts by level, endpoint, MITRE technique and rule. To analyze your own JSONL export, run `python3 tools/triage.py /path/to/alerts.json --min-level 10 --agent 003 --output triage.md`.
 
-The bundled JSONL and [generated report](examples/triage.sample.md) are **synthetic demonstration fixtures**, separate from the real lab screenshots. No credentials or live manager access are needed to try them.
+The export and report are synthetic; the screenshots above are real lab captures. No manager access is needed for the example.
 
-Malformed JSON, invalid levels and unsupported field shapes stop processing with exit code `2` and a line number. Output is written only after parsing succeeds. Untrusted fields are escaped for Markdown/HTML rendering.
+Invalid input stops with a line number and exit code `2`. No report is written after a parsing error.
 
 ## Verify
 
@@ -52,10 +51,10 @@ Malformed JSON, invalid levels and unsupported field shapes stop processing with
 python3 -m unittest discover -s tests -v
 ```
 
-Regression tests cover triage parsing and output, plus quarantine path/rule validation, dry-run behavior, symlinks, missing files and file moves. They use temporary directories and synthetic messages; they do not contact a Wazuh manager or perform a live Active Response integration test.
+Tests cover triage input and quarantine success and rejection paths using temporary files.
 
 ## Reproduce the lab
 
-See [lab setup notes](docs/lab-setup.md) for FIM and VirusTotal configuration and the EICAR test workflow. Addresses and paths are examples from a private VMware NAT network. Bring your own Wazuh installation and VirusTotal API key. Follow the linked official Wazuh documentation for the installed version.
+See [lab setup notes](docs/lab-setup.md) for FIM, VirusTotal, a synthetic quarantine dry run and optional live setup. A live lab needs your own Wazuh installation and VirusTotal API key.
 
-The quarantine message at [examples/quarantine-alert.sample.json](examples/quarantine-alert.sample.json) is synthetic. The offline triage tool and quarantine handler are tested locally; neither has been deployed as a live SOC integration.
+The [quarantine message](examples/quarantine-alert.sample.json) is synthetic. Neither tool has been deployed as a live SOC integration.
