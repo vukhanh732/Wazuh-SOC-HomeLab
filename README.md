@@ -15,7 +15,7 @@ Kali    ─┘       → endpoint inventory, FIM, MITRE views
 Exported JSONL alerts → Python triage tool → Markdown investigation summary
 ```
 
-The lab setup notes describe the VirusTotal and Active Response quarantine configuration. The custom quarantine script is not checked in, so automated containment is not a turnkey feature of this repository. The new triage utility runs separately on exported alerts and does not connect to the manager or change files on endpoints.
+The repository includes a constrained Linux Active Response quarantine handler. It accepts only a stateless `add` message for rule `87105` with `data.virustotal.source.file` directly inside a configured watch directory. It defaults to dry-run; the supplied wrapper enables moving files into a separate quarantine directory. Review the [installation and test notes](docs/lab-setup.md) before enabling it. The handler has local filesystem tests, but has not been validated against a live Wazuh manager or agent.
 
 ## Evidence from the lab
 
@@ -52,10 +52,10 @@ Malformed JSON, invalid levels and unsupported field shapes stop processing with
 python3 -m unittest discover -s tests -v
 ```
 
-Regression tests cover filtering/counting, technique deduplication, malformed alerts and untrusted report text.
+Regression tests cover triage parsing and output, plus quarantine path/rule validation, dry-run behavior, symlinks, missing files and file moves. They use temporary directories and synthetic messages; they do not contact a Wazuh manager or perform a live Active Response integration test.
 
 ## Reproduce the lab
 
 See [lab setup notes](docs/lab-setup.md) for FIM and VirusTotal configuration and the EICAR test workflow. Addresses and paths are examples from a private VMware NAT network. Bring your own Wazuh installation and VirusTotal API key. Follow the linked official Wazuh documentation for the installed version.
 
-Next work: include a reviewed response implementation, test failed response actions, and add noisier investigation scenarios. The offline triage tool is tested locally; it has not been deployed as a live SOC integration.
+The quarantine message at [examples/quarantine-alert.sample.json](examples/quarantine-alert.sample.json) is synthetic. The offline triage tool and quarantine handler are tested locally; neither has been deployed as a live SOC integration.
